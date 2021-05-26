@@ -1,10 +1,21 @@
-from pettingzoo.utils.env import ParallelEnv
-from pettingzoo import AECEnv
-from gym import spaces
-from pettingzoo.utils import agent_selector, wrappers
-from .render import Renderer
+from smac.env import StarCraft2Env
+from gym.utils import EzPickle
 from gym.utils import seeding
+from gym import spaces
+from pettingzoo.utils.env import ParallelEnv
+from pettingzoo.utils.conversions import from_parallel_wrapper
+from pettingzoo.utils import wrappers
 import numpy as np
+
+max_cycles_default = 1000
+
+
+def parallel_env(max_cycles=max_cycles_default, **smac_args):
+    return _parallel_env(max_cycles, **smac_args)
+
+
+def raw_env(max_cycles=max_cycles_default, **smac_args):
+    return from_parallel_wrapper(parallel_env(max_cycles, **smac_args))
 
 
 def make_env(raw_env):
@@ -32,7 +43,6 @@ class smac_parallel_env(ParallelEnv):
                                'action_mask': spaces.Box(low=0, high=1, shape=(self.action_spaces[name].n,), dtype=np.int8)})
             for name in self.agents
         }
-        self._renderer = None
         self._reward = 0
 
     def _init_agents(self):
@@ -84,15 +94,10 @@ class smac_parallel_env(ParallelEnv):
         self.env.full_restart()
 
     def render(self, mode="human"):
-        if self._renderer is None:
-            self._renderer = Renderer(self.env, self.env.window_size, mode)
-        assert mode == self._renderer.mode, "mode must be consistent across render calls"
-        return self._renderer.render(mode, self._reward, self.frames)
+        self.env.render(mode)
 
     def close(self):
-        if self._renderer is not None:
-            self._renderer.close()
-            self._renderer = None
+        self.env.close()
 
     def reset(self):
         self.env._episode_count = 1
@@ -159,3 +164,15 @@ class smac_parallel_env(ParallelEnv):
 
     def __del__(self):
         self.env.close()
+
+
+env = make_env(raw_env)
+
+
+class _parallel_env(smac_parallel_env, EzPickle):
+    metadata = {'render.modes': ['human'], 'name': "sc2"}
+
+    def __init__(self, max_cycles, **smac_args):
+        EzPickle.__init__(self, max_cycles, **smac_args)
+        env = StarCraft2Env(**smac_args)
+        super().__init__(env, max_cycles)

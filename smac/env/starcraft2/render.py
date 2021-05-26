@@ -17,8 +17,6 @@ from pysc2.lib.renderer_human import _Surface
 from pysc2.lib import transform
 from pysc2.lib import features
 
-from s2clientprotocol import raw_pb2 as sc_raw
-
 
 def clamp(n, smallest, largest):
     return max(smallest, min(n, largest))
@@ -41,7 +39,7 @@ def _get_desktop_size():
 
 
 class Renderer:
-    def __init__(self, env, map_size, mode):
+    def __init__(self, env, mode):
         os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = 'hide'
 
         self.env = env
@@ -63,8 +61,8 @@ class Renderer:
         point.Point.build(game_info.start_raw.playable_area.p0),
         point.Point.build(game_info.start_raw.playable_area.p1))
 
-        # window_size_px = self._map_size.scale_max_size(_get_desktop_size() * self._window_scale).ceil()
         window_size_px = point.Point(self.env.window_size[0], self.env.window_size[1])
+        window_size_px = self._map_size.scale_max_size(window_size_px * self._window_scale).ceil()
         self._scale = window_size_px.y // 32
 
         self.display = pygame.Surface(window_size_px)
@@ -107,10 +105,10 @@ class Renderer:
                 self._name_lengths[key] = name
         return self._name_lengths[key]
 
-    def render(self, mode, reward, frames):
+    def render(self, mode):
         self.obs = self.env._obs
-        self.score = reward
-        self.step = frames
+        self.score = self.env.reward
+        self.step = self.env._episode_steps
 
         now = time.time()
         self._game_times.append((now - self._last_time, max(1, self.obs.observation.game_loop - self.obs.observation.game_loop)))
